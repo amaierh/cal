@@ -1,0 +1,9 @@
+{
+  "appId": "com.calculator.app",
+  "appName": "Calculator",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true
+  }
+}

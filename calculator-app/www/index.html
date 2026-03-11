@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>حاسبة</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --btn-num: #222222;
+      --btn-op: #ff6b00;
+      --btn-top: #333333;
+      --text: #f0f0f0;
+      --text-dim: #666;
+      --radius: 20px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      font-family: 'IBM Plex Mono', monospace;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* Display */
+    .display {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 24px 8px 20px;
+    }
+
+    .expression {
+      color: var(--text-dim);
+      font-size: 15px;
+      text-align: right;
+      min-height: 22px;
+      letter-spacing: 1px;
+      transition: opacity 0.2s;
+    }
+
+    .result {
+      color: var(--text);
+      font-size: 64px;
+      font-weight: 300;
+      text-align: right;
+      letter-spacing: -2px;
+      line-height: 1.1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      transition: font-size 0.15s;
+    }
+
+    .result.long { font-size: 40px; }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #333, transparent);
+      margin-bottom: 16px;
+    }
+
+    /* Buttons grid */
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      padding-bottom: 8px;
+    }
+
+    .btn {
+      background: var(--btn-num);
+      color: var(--text);
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 22px;
+      font-weight: 400;
+      padding: 0;
+      height: 76px;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      transition: transform 0.08s, background 0.1s, box-shadow 0.1s;
+      position: relative;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn:active {
+      transform: scale(0.93);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+
+    .btn.op {
+      background: var(--btn-op);
+      color: #fff;
+      font-size: 26px;
+      font-weight: 600;
+    }
+
+    .btn.top {
+      background: var(--btn-top);
+      color: var(--text);
+      font-size: 18px;
+    }
+
+    .btn.zero {
+      grid-column: span 2;
+    }
+
+    /* Ripple */
+    .btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.08);
+      opacity: 0;
+      border-radius: inherit;
+      transition: opacity 0.15s;
+    }
+    .btn:active::after { opacity: 1; }
+
+    /* Glow on operator active */
+    .btn.op.active-op {
+      box-shadow: 0 0 20px rgba(255,107,0,0.5);
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="display">
+    <div class="expression" id="expression"></div>
+    <div class="result" id="result">0</div>
+  </div>
+  <div class="divider"></div>
+  <div class="buttons">
+    <!-- Row 1 -->
+    <button class="btn top" data-val="C">C</button>
+    <button class="btn top" data-val="±">±</button>
+    <button class="btn top" data-val="%">%</button>
+    <button class="btn op"  data-val="÷">÷</button>
+    <!-- Row 2 -->
+    <button class="btn" data-val="7">7</button>
+    <button class="btn" data-val="8">8</button>
+    <button class="btn" data-val="9">9</button>
+    <button class="btn op" data-val="×">×</button>
+    <!-- Row 3 -->
+    <button class="btn" data-val="4">4</button>
+    <button class="btn" data-val="5">5</button>
+    <button class="btn" data-val="6">6</button>
+    <button class="btn op" data-val="-">−</button>
+    <!-- Row 4 -->
+    <button class="btn" data-val="1">1</button>
+    <button class="btn" data-val="2">2</button>
+    <button class="btn" data-val="3">3</button>
+    <button class="btn op" data-val="+">+</button>
+    <!-- Row 5 -->
+    <button class="btn zero" data-val="0">0</button>
+    <button class="btn" data-val=".">.</button>
+    <button class="btn op" data-val="=">=</button>
+  </div>
+</div>
+
+<script>
+  let display = '0';
+  let expression = '';
+  let firstNum = null;
+  let operator = null;
+  let reset = false;
+  let justCalc = false;
+
+  const resultEl = document.getElementById('result');
+  const expressionEl = document.getElementById('expression');
+
+  function updateDisplay() {
+    resultEl.textContent = display;
+    expressionEl.textContent = expression;
+    resultEl.classList.toggle('long', display.length > 9);
+  }
+
+  function formatNum(n) {
+    if (isNaN(n) || !isFinite(n)) return 'خطأ';
+    let s = parseFloat(n.toPrecision(10)).toString();
+    if (s.includes('e')) return n.toExponential(3);
+    return s;
+  }
+
+  function handleInput(val) {
+    const nums = ['0','1','2','3','4','5','6','7','8','9'];
+    const ops  = ['+','-','×','÷'];
+
+    if (val === 'C') {
+      display = '0'; expression = '';
+      firstNum = null; operator = null;
+      reset = false; justCalc = false;
+      clearOpHighlight();
+    }
+    else if (val === '⌫') {
+      if (display.length > 1) display = display.slice(0,-1);
+      else display = '0';
+    }
+    else if (val === '±') {
+      if (display !== '0') {
+        display = display.startsWith('-') ? display.slice(1) : '-' + display;
+      }
+    }
+    else if (val === '%') {
+      let n = parseFloat(display);
+      display = formatNum(n / 100);
+    }
+    else if (ops.includes(val)) {
+      if (operator && !reset && !justCalc) {
+        // chain calculation
+        let a = firstNum, b = parseFloat(display);
+        firstNum = calc(a, operator, b);
+        display = formatNum(firstNum);
+      } else {
+        firstNum = parseFloat(display);
+      }
+      operator = val;
+      expression = `${display} ${val}`;
+      reset = true;
+      justCalc = false;
+      highlightOp(val);
+    }
+    else if (val === '=') {
+      if (operator !== null && firstNum !== null) {
+        let b = parseFloat(display);
+        expression = `${formatNum(firstNum)} ${operator} ${display} =`;
+        let r = calc(firstNum, operator, b);
+        display = formatNum(r);
+        firstNum = null; operator = null;
+        reset = true; justCalc = true;
+        clearOpHighlight();
+      }
+    }
+    else if (val === '.') {
+      if (reset) { display = '0.'; reset = false; }
+      else if (!display.includes('.')) display += '.';
+    }
+    else if (nums.includes(val)) {
+      if (reset || display === '0') {
+        display = val; reset = false;
+      } else {
+        if (display.length < 12) display += val;
+      }
+      justCalc = false;
+    }
+
+    updateDisplay();
+  }
+
+  function calc(a, op, b) {
+    if (op === '+') return a + b;
+    if (op === '-') return a - b;
+    if (op === '×') return a * b;
+    if (op === '÷') return b === 0 ? NaN : a / b;
+    return b;
+  }
+
+  function highlightOp(val) {
+    clearOpHighlight();
+    const map = {'+':'+', '-':'−', '×':'×', '÷':'÷'};
+    document.querySelectorAll('.btn.op').forEach(btn => {
+      if (btn.dataset.val === val) btn.classList.add('active-op');
+    });
+  }
+
+  function clearOpHighlight() {
+    document.querySelectorAll('.btn.op').forEach(b => b.classList.remove('active-op'));
+  }
+
+  document.querySelectorAll('.btn').forEach(btn => {
+    btn.addEventListener('click', () => handleInput(btn.dataset.val));
+  });
+
+  // Keyboard support
+  document.addEventListener('keydown', e => {
+    const map = {
+      '0':'0','1':'1','2':'2','3':'3','4':'4',
+      '5':'5','6':'6','7':'7','8':'8','9':'9',
+      '+':'+','-':'-','*':'×','/':'÷',
+      'Enter':'=','=':'=','.':'.','Backspace':'⌫',
+      'Escape':'C','%':'%'
+    };
+    if (map[e.key]) { e.preventDefault(); handleInput(map[e.key]); }
+  });
+
+  updateDisplay();
+</script>
+</body>
+</html>
